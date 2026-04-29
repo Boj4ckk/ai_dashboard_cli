@@ -1,0 +1,15 @@
+[project]
+name = "ai_dashboard_cli"
+version="2026.0.0"
+dependencies = [
+    "fastapi>=0.136.0",
+    "pydantic-settings>=2.14.0",
+    "uvicorn>=0.34.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"

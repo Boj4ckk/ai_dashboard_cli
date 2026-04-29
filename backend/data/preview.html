@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Top 10 Clients par Revenue</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/npm/@prefecthq/prefab-ui@0.19.1/dist/app/renderer.css">
+  <script type="module" crossorigin src="https://cdn.jsdelivr.net/npm/@prefecthq/prefab-ui@0.19.1/dist/app/renderer.js"></script>
+</head>
+<body>
+  <div id="root" style="max-width:64rem;margin:0 auto;padding:2rem"></div>
+  <script id="prefab:initial-data" type="application/json">{"$prefab":{"version":"0.2"},"view":{"cssClass":"pf-app-root","type":"Div","children":[{"type":"Column","children":[{"content":"Top 10 Clients par Revenue","type":"Heading","level":1},{"type":"PieChart","data":[{"client":"Client 38435","revenue":9725},{"client":"Client 27000","revenue":9518},{"client":"Client 25121","revenue":7623},{"client":"Client 35168","revenue":7601},{"client":"Client 9025","revenue":6263},{"client":"Client 8650","revenue":6065},{"client":"Client 3965","revenue":5670},{"client":"Client 9477","revenue":5497},{"client":"Client 15027","revenue":3621},{"client":"Client 30893","revenue":3383}],"dataKey":"revenue","nameKey":"client","height":400,"innerRadius":60,"showLabel":false,"paddingAngle":2,"showLegend":true,"showTooltip":true,"animate":true}]}]}}</script>
+</body>
+<script>
+  const observer = new ResizeObserver(() => {
+    window.parent.postMessage({
+      height: document.body.scrollHeight,
+      width: document.body.scrollWidth
+    }, '*')
+  })
+  observer.observe(document.body)
+</script>
+</html>
