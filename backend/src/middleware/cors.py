@@ -5,6 +5,10 @@ def add_cors_middleware(app):
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173"],
-        allow_methods=["*"],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         allow_headers=["*"],
+        allow_origin_regex=None,
+        expose_headers=[],
+        max_age=600,
     )

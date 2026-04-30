@@ -1,25 +1,24 @@
 
 
-from fastapi import APIRouter
+from agents.lucy_agent import LucyAgent
+from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
 from .models.dto import PromptRequest
+from core.dependencies import AIProviderDep
 
 
-
-router = APIRouter(prefix="/chat", tags=["chat"])
+router = APIRouter(prefix="/chat", tags=["chat"], redirect_slashes=False)
 
 @router.post("")
-async def post_prompt(body: PromptRequest) -> dict:
+async def post_prompt(
+    body: PromptRequest,
+    ai_provider: AIProviderDep
+    ) -> dict:
+
+    lucy = LucyAgent(ai_provider)
+    result = await lucy.generate_response(
+        body.prompt
+    )
+    return result
  
-    return {
-        "response_code": 200,
-        "response_message": f"Received prompt: {body.prompt}"
-    }
-
-@router.get("/test")
-async def get_test() -> HTMLResponse:
-    with open("data/preview.html", "r") as f:
-        html_content = f.read()
-    return HTMLResponse(content=html_content, status_code=200)
-
-
+    
