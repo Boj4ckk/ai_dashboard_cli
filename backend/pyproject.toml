@@ -1,4 +1,4 @@
-[project]
+langchain-openai[project]
 name = "ai_dashboard_cli"
 version="2026.0.0"
 dependencies = [
@@ -7,7 +7,8 @@ dependencies = [
     "uvicorn>=0.34.0",
     "langgraph>=1.1.10",
     "openai>=2.33.0",
-    "langchain-mcp-adapters>=0.2.2"
+    "langchain-mcp-adapters>=0.2.2",
+    "langchain-openai>=1.2.1"
 ]
 
 [tool.setuptools.packages.find]

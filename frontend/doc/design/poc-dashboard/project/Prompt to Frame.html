@@ -1,0 +1,1978 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Prompt to Frame — BI Canvas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Mistral palette */
+    --bg-base: #FFFFFF;
+    --bg-subtle: #F7F7F8;
+    --bg-muted: #EFEFEF;
+    --bg-overlay: #E8E8EA;
+    --border: #E5E5E7;
+    --border-strong: #CACAD0;
+    --border-subtle: #F0F0F2;
+    --text-primary: #0D0D0D;
+    --text-secondary: #666677;
+    --text-muted: #9B9BA8;
+    --text-inverted: #FFFFFF;
+    --accent: #FF5721;
+    --accent-hover: #E84D1C;
+    --accent-subtle: #FFF0EB;
+    --accent-muted: #FFCAB8;
+
+    --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-display: 'Geist', ui-sans-serif, system-ui, sans-serif;
+
+    --density: 1;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; width: 100%;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    overflow: hidden;
+  }
+
+  /* ── Top chrome ─────────────────────────────────────────── */
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 48px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; z-index: 100;
+    background: rgba(255,255,255,0.72);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 0.5px solid var(--border);
+  }
+  .topbar-l, .topbar-r { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 600; font-size: 13px; letter-spacing: -0.01em;
+  }
+  .logo-mark {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--text-primary);
+    display: grid; place-items: center; color: var(--accent);
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  }
+  .crumb { color: var(--text-secondary); font-size: 12.5px; }
+  .crumb b { color: var(--text-primary); font-weight: 500; }
+  .crumb-sep { color: var(--text-muted); margin: 0 4px; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 10px; border-radius: 999px;
+    background: var(--bg-subtle); border: 0.5px solid var(--border);
+    color: var(--text-secondary); font-size: 11.5px; font-weight: 500;
+  }
+  .pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #34C759;
+  }
+  .icon-btn {
+    width: 28px; height: 28px; border-radius: 7px; border: 0;
+    display: grid; place-items: center; cursor: pointer;
+    background: transparent; color: var(--text-secondary);
+  }
+  .icon-btn:hover { background: var(--bg-muted); color: var(--text-primary); }
+
+  /* ── Canvas ──────────────────────────────────────────────── */
+  .canvas-host {
+    position: fixed; inset: 48px 0 0 0;
+    overflow: hidden;
+    background: var(--bg-base);
+  }
+  .canvas {
+    position: absolute; inset: 0;
+    transform-origin: 0 0;
+    cursor: grab;
+  }
+  .canvas.panning { cursor: grabbing; }
+  .canvas-grid {
+    position: absolute; left: -2000px; top: -2000px;
+    width: 8000px; height: 8000px;
+    background-image: radial-gradient(circle, var(--bg-overlay) 1px, transparent 1px);
+    background-size: 24px 24px;
+    pointer-events: none;
+    opacity: 0.7;
+  }
+
+  /* ── Frame ───────────────────────────────────────────────── */
+  .frame {
+    position: absolute;
+    background: var(--bg-base);
+    border: 0.5px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+    display: flex; flex-direction: column;
+  }
+  .frame:hover {
+    border-color: var(--border-strong);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02), 0 8px 24px rgba(0,0,0,0.04);
+  }
+  .frame.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-subtle), 0 8px 32px rgba(255,87,33,0.10);
+  }
+  .frame.empty {
+    border-style: dashed;
+    background: var(--bg-subtle);
+  }
+  .frame.empty.selected {
+    background: var(--accent-subtle);
+    border-style: solid;
+  }
+  .frame-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 0.5px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+  .frame-head .title {
+    font-size: 12px; font-weight: 600; color: var(--text-primary);
+    letter-spacing: -0.005em;
+  }
+  .frame-head .meta {
+    font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--text-muted); display: flex; align-items: center; gap: 8px;
+  }
+  .frame-body {
+    flex: 1; min-height: 0; padding: 14px; overflow: hidden;
+    position: relative;
+  }
+  .frame-empty-content {
+    height: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    color: var(--text-muted);
+  }
+  .frame-empty-content .label {
+    font-family: var(--font-mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .frame-empty-content .hint {
+    font-size: 12px; color: var(--text-secondary);
+  }
+  .frame-empty-content .kbd {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 6px; border-radius: 4px;
+    background: var(--bg-base); border: 0.5px solid var(--border);
+    font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--text-secondary);
+  }
+  .frame-tag {
+    position: absolute; top: -8px; left: 12px;
+    padding: 2px 8px; border-radius: 999px;
+    background: var(--accent); color: var(--text-inverted);
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    opacity: 0; transform: translateY(2px);
+    transition: opacity .15s, transform .15s;
+    pointer-events: none;
+  }
+  .frame.selected .frame-tag { opacity: 1; transform: translateY(0); }
+
+  .frame-loading {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(2px);
+  }
+  .frame-loading .skel {
+    width: 100%; height: 100%; padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .skel-bar {
+    background: linear-gradient(90deg,
+      var(--bg-muted) 0%, var(--bg-subtle) 50%, var(--bg-muted) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite linear;
+    border-radius: 4px;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  .frame-close {
+    width: 22px; height: 22px; border-radius: 5px; border: 0;
+    background: transparent; cursor: pointer;
+    display: grid; place-items: center; color: var(--text-muted);
+  }
+  .frame-close:hover { background: var(--bg-muted); color: var(--text-primary); }
+
+  /* ── Prompt bar ──────────────────────────────────────────── */
+  .prompt-bar {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    width: min(680px, calc(100vw - 32px));
+    z-index: 200;
+    background: rgba(255,255,255,0.82);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    backdrop-filter: blur(28px) saturate(180%);
+    border: 0.5px solid var(--border);
+    border-radius: 16px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.6) inset,
+      0 1px 2px rgba(0,0,0,0.04),
+      0 24px 64px -8px rgba(0,0,0,0.16);
+    transition: transform .25s cubic-bezier(.2,.8,.2,1),
+                opacity .2s, border-color .18s, box-shadow .18s;
+  }
+  .prompt-bar.targeting {
+    border-color: var(--accent-muted);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.6) inset,
+      0 0 0 4px var(--accent-subtle),
+      0 24px 64px -8px rgba(255,87,33,0.18);
+  }
+  .prompt-target {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px 4px;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+  }
+  .prompt-target .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 8px 3px 6px; border-radius: 999px;
+    background: var(--accent-subtle); color: var(--accent);
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .prompt-target .chip i {
+    width: 6px; height: 6px; border-radius: 1px;
+    background: var(--accent);
+  }
+  .prompt-target .chip-x {
+    margin-left: 2px; opacity: 0.6;
+    cursor: pointer; padding: 0 2px;
+  }
+  .prompt-target .chip-x:hover { opacity: 1; }
+  .prompt-row {
+    display: flex; align-items: flex-end; gap: 8px;
+    padding: 6px 10px 10px 14px;
+  }
+  .prompt-input {
+    flex: 1; min-width: 0;
+    border: 0; outline: 0; background: transparent;
+    font: inherit; font-size: 14.5px;
+    color: var(--text-primary);
+    resize: none; padding: 8px 4px; line-height: 1.5;
+    max-height: 140px; min-height: 28px;
+    font-family: var(--font-sans);
+  }
+  .prompt-input::placeholder { color: var(--text-muted); }
+  .prompt-actions {
+    display: flex; align-items: center; gap: 6px;
+    padding-bottom: 4px;
+  }
+  .agent-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 30px; padding: 0 10px 0 8px;
+    border-radius: 999px; border: 0.5px solid var(--border);
+    background: var(--bg-subtle); cursor: pointer;
+    font-size: 11.5px; font-weight: 500; color: var(--text-secondary);
+    transition: all .18s;
+  }
+  .agent-pill:hover {
+    background: var(--bg-muted); border-color: var(--border-strong);
+    color: var(--text-primary);
+  }
+  .agent-pill.active {
+    background: var(--accent-subtle); border-color: var(--accent-muted);
+    color: var(--accent); animation: agent-pulse 1.6s infinite ease-in-out;
+  }
+  .agent-pill .agent-dot {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--bg-overlay); position: relative;
+    display: grid; place-items: center;
+  }
+  .agent-pill.active .agent-dot {
+    background: transparent;
+  }
+  .agent-pill .agent-dot svg {
+    width: 14px; height: 14px;
+  }
+  .agent-pill.active .agent-dot svg {
+    animation: spin 2.4s linear infinite;
+  }
+  @keyframes agent-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--accent-subtle); }
+    50% { box-shadow: 0 0 0 6px transparent; }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .send-btn {
+    width: 32px; height: 32px; border-radius: 8px; border: 0;
+    background: var(--text-primary); color: var(--text-inverted);
+    cursor: pointer; display: grid; place-items: center;
+    transition: background .15s, transform .12s;
+  }
+  .send-btn:hover { background: #2a2a2a; }
+  .send-btn:active { transform: scale(0.96); }
+  .send-btn[disabled] {
+    background: var(--bg-overlay); color: var(--text-muted); cursor: not-allowed;
+  }
+  .send-btn.ready { background: var(--accent); }
+  .send-btn.ready:hover { background: var(--accent-hover); }
+
+  .prompt-hint {
+    padding: 0 14px 10px;
+    display: flex; gap: 14px; align-items: center;
+    font-size: 11px; color: var(--text-muted);
+  }
+  .prompt-hint .kbd {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 5px; border-radius: 4px;
+    background: var(--bg-muted); border: 0.5px solid var(--border);
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--text-secondary);
+  }
+
+  /* ── Liquid glass modal ─────────────────────────────────── */
+  .glass-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    background: transparent;
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity .22s ease;
+  }
+  .glass-overlay.open { opacity: 1; }
+
+  .glass-modal {
+    position: fixed; left: 50%; top: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: min(720px, calc(100vw - 48px));
+    max-height: min(720px, calc(100vh - 96px));
+    z-index: 310;
+    border-radius: 28px;
+    overflow: hidden;
+    opacity: 0;
+    transition: transform .35s cubic-bezier(.2,.9,.25,1.05), opacity .25s;
+    display: flex; flex-direction: column;
+    /* Liquid glass: layered backdrop filters */
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06));
+    -webkit-backdrop-filter: blur(40px) saturate(200%) brightness(1.08);
+    backdrop-filter: blur(40px) saturate(200%) brightness(1.08);
+    border: 0.5px solid rgba(255,255,255,0.7);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.9) inset,
+      0 0 0 0.5px rgba(0,0,0,0.04),
+      0 30px 80px -10px rgba(0,0,0,0.25),
+      0 8px 24px -4px rgba(0,0,0,0.10);
+  }
+  .glass-modal.open {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+
+  /* The "lens zoom" effect: a layer behind the canvas is slightly scaled
+     to mimic the magnification of glass. Achieved by transforming the
+     canvas itself when modal is open. */
+  .canvas-host.glass-active .canvas {
+    transform-origin: 50% 50%;
+    transition: transform .35s cubic-bezier(.2,.9,.25,1.05),
+                filter .35s ease;
+  }
+
+  /* Specular highlight overlay on the modal */
+  .glass-modal::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(120% 80% at 30% 0%, rgba(255,255,255,0.55), transparent 50%),
+      radial-gradient(80% 60% at 100% 100%, rgba(255,87,33,0.06), transparent 60%);
+    mix-blend-mode: screen;
+  }
+  .glass-modal::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    border-radius: inherit;
+    box-shadow:
+      0 0 0 0.5px rgba(255,255,255,0.3) inset,
+      0 -1px 0 rgba(255,255,255,0.5) inset;
+  }
+
+  .glass-head {
+    position: relative; z-index: 1;
+    padding: 18px 22px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 0.5px solid rgba(0,0,0,0.06);
+  }
+  .glass-head h2 {
+    margin: 0; font-size: 15px; font-weight: 600;
+    color: var(--text-primary); letter-spacing: -0.01em;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .glass-head .live {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px; border-radius: 999px;
+    background: rgba(255,87,33,0.10); color: var(--accent);
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .glass-head .live i {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+    animation: blink 1.2s infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .glass-close {
+    width: 28px; height: 28px; border-radius: 8px; border: 0;
+    background: rgba(0,0,0,0.05); color: var(--text-secondary);
+    cursor: pointer; display: grid; place-items: center;
+  }
+  .glass-close:hover { background: rgba(0,0,0,0.10); color: var(--text-primary); }
+
+  .glass-body {
+    position: relative; z-index: 1;
+    flex: 1; min-height: 0; overflow-y: auto;
+    padding: 18px 22px 22px;
+    display: flex; flex-direction: column; gap: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,0,0,0.15) transparent;
+  }
+  .glass-body::-webkit-scrollbar { width: 6px; }
+  .glass-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+
+  /* Conversation bubbles */
+  .msg {
+    display: flex; flex-direction: column; gap: 6px;
+    max-width: 88%;
+  }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.assistant { align-self: flex-start; align-items: flex-start; }
+  .msg-meta {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 0 4px;
+  }
+  .msg-bubble {
+    padding: 11px 14px; border-radius: 14px;
+    font-size: 13.5px; line-height: 1.5;
+    color: var(--text-primary);
+  }
+  .msg.user .msg-bubble {
+    background: rgba(13,13,13,0.88); color: var(--text-inverted);
+    border-bottom-right-radius: 4px;
+  }
+  .msg.assistant .msg-bubble {
+    background: rgba(255,255,255,0.72);
+    border: 0.5px solid rgba(0,0,0,0.06);
+    border-bottom-left-radius: 4px;
+  }
+
+  /* Tool call traces */
+  .trace {
+    display: flex; flex-direction: column; gap: 0;
+    background: rgba(255,255,255,0.5);
+    border: 0.5px solid rgba(0,0,0,0.06);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .trace-step {
+    display: flex; gap: 12px; padding: 10px 14px;
+    border-bottom: 0.5px solid rgba(0,0,0,0.04);
+    font-size: 12px;
+    align-items: flex-start;
+  }
+  .trace-step:last-child { border-bottom: 0; }
+  .trace-step .step-icon {
+    width: 18px; height: 18px; border-radius: 5px;
+    display: grid; place-items: center; flex-shrink: 0;
+    margin-top: 1px;
+    font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+    background: var(--bg-muted); color: var(--text-secondary);
+  }
+  .trace-step.done .step-icon {
+    background: rgba(52,199,89,0.15); color: #2a9943;
+  }
+  .trace-step.active .step-icon {
+    background: var(--accent-subtle); color: var(--accent);
+    animation: blink 1.4s infinite;
+  }
+  .trace-step .step-body { flex: 1; min-width: 0; }
+  .trace-step .step-title {
+    font-weight: 500; color: var(--text-primary);
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap;
+  }
+  .trace-step .step-tool {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--accent); padding: 1px 6px; border-radius: 4px;
+    background: var(--accent-subtle);
+  }
+  .trace-step .step-detail {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--text-secondary); margin-top: 4px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .trace-step .step-time {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--text-muted); margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  /* Editorial direction overrides */
+  body.style-editorial {
+    --bg-base: #FAF8F4;
+    --bg-subtle: #F2EEE7;
+    --bg-muted: #E8E2D8;
+    --bg-overlay: #DDD6C7;
+    --border: #E0D9CC;
+    --border-subtle: #EDE7DA;
+    --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  }
+  body.style-editorial .frame { border-radius: 4px; }
+  body.style-editorial .frame:hover {
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03), 0 12px 32px rgba(0,0,0,0.06);
+  }
+  body.style-editorial .frame-head .title {
+    font-family: var(--font-display);
+    font-size: 16px; font-weight: 400;
+    letter-spacing: -0.005em;
+    font-style: italic;
+  }
+  body.style-editorial .glass-modal { border-radius: 8px; }
+  body.style-editorial .prompt-bar { border-radius: 6px; }
+  body.style-editorial .canvas-grid {
+    background-image: radial-gradient(circle, var(--border) 0.5px, transparent 0.5px);
+  }
+  body.style-editorial .glass-head h2 {
+    font-family: var(--font-display); font-style: italic;
+    font-weight: 400; font-size: 19px;
+  }
+
+  /* Density */
+  body.density-compact .frame-head { padding: 7px 12px; }
+  body.density-compact .frame-body { padding: 10px; }
+
+  /* Pan/zoom indicator */
+  .zoom-indicator {
+    position: fixed; bottom: 24px; right: 24px;
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px;
+    background: rgba(255,255,255,0.8);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    z-index: 90;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .zoom-indicator button {
+    width: 24px; height: 24px; border: 0; background: transparent;
+    border-radius: 6px; cursor: pointer; color: var(--text-secondary);
+    display: grid; place-items: center;
+  }
+  .zoom-indicator button:hover { background: var(--bg-muted); color: var(--text-primary); }
+  .zoom-indicator .zval {
+    font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--text-secondary); padding: 0 6px;
+    min-width: 38px; text-align: center;
+  }
+
+  /* Hide app element when modal is open */
+  .canvas-host.glass-active .canvas {
+    transform: scale(var(--canvas-zoom, 1)) translate(var(--canvas-tx, 0), var(--canvas-ty, 0));
+  }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-presets="react">
+// Lightweight SVG chart components.
+// All use viewBox to scale into the parent frame; styling via CSS vars.
+
+const CHART_PALETTE = [
+  '#FF5721', // Mistral accent
+  '#0D0D0D', // primary
+  '#9B9BA8',
+  '#FFCAB8',
+  '#666677',
+  '#E84D1C',
+];
+
+function ChartContainer({ children, title, subtitle }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      width: '100%', height: '100%', gap: 8,
+    }}>
+      {(title || subtitle) && (
+        <div style={{ flexShrink: 0 }}>
+          {title && <div style={{
+            fontSize: 11, fontFamily: 'var(--font-mono)',
+            color: 'var(--text-muted)', textTransform: 'uppercase',
+            letterSpacing: '0.06em', marginBottom: 2,
+          }}>{title}</div>}
+          {subtitle && <div style={{
+            fontSize: 18, fontWeight: 600, color: 'var(--text-primary)',
+            letterSpacing: '-0.015em', lineHeight: 1.1,
+          }}>{subtitle}</div>}
+        </div>
+      )}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── Bar Chart ───────────────────────────────────────────
+function BarChart({ data, title, subtitle, horizontal = false }) {
+  const W = 400, H = 200;
+  const PAD = { l: horizontal ? 80 : 32, r: 12, t: 8, b: horizontal ? 12 : 28 };
+  const max = Math.max(...data.map(d => d.value));
+  const innerW = W - PAD.l - PAD.r;
+  const innerH = H - PAD.t - PAD.b;
+
+  if (horizontal) {
+    const barH = innerH / data.length * 0.7;
+    const gap = innerH / data.length * 0.3;
+    return (
+      <ChartContainer title={title} subtitle={subtitle}>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+             style={{ width: '100%', height: '100%' }}>
+          {data.map((d, i) => {
+            const w = (d.value / max) * innerW;
+            const y = PAD.t + i * (barH + gap) + gap / 2;
+            return (
+              <g key={i}>
+                <text x={PAD.l - 8} y={y + barH / 2 + 3.5}
+                      textAnchor="end" fontSize="10"
+                      fill="var(--text-secondary)"
+                      fontFamily="var(--font-sans)">{d.label}</text>
+                <rect x={PAD.l} y={y} width={w} height={barH}
+                      fill={CHART_PALETTE[0]} rx="2" />
+                <text x={PAD.l + w + 4} y={y + barH / 2 + 3.5}
+                      fontSize="10" fill="var(--text-primary)"
+                      fontFamily="var(--font-mono)" fontWeight="500">
+                  {d.value.toLocaleString()}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </ChartContainer>
+    );
+  }
+
+  const barW = innerW / data.length * 0.6;
+  const gap = innerW / data.length * 0.4;
+  return (
+    <ChartContainer title={title} subtitle={subtitle}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+           style={{ width: '100%', height: '100%' }}>
+        {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
+          <line key={i}
+                x1={PAD.l} x2={W - PAD.r}
+                y1={PAD.t + innerH * (1 - p)} y2={PAD.t + innerH * (1 - p)}
+                stroke="var(--border-subtle)" strokeWidth="0.5" />
+        ))}
+        {[0, 0.5, 1].map((p, i) => (
+          <text key={i} x={PAD.l - 6}
+                y={PAD.t + innerH * (1 - p) + 3}
+                textAnchor="end" fontSize="9"
+                fill="var(--text-muted)" fontFamily="var(--font-mono)">
+            {Math.round(max * p).toLocaleString()}
+          </text>
+        ))}
+        {data.map((d, i) => {
+          const h = (d.value / max) * innerH;
+          const x = PAD.l + i * (barW + gap) + gap / 2;
+          const y = PAD.t + innerH - h;
+          return (
+            <g key={i}>
+              <rect x={x} y={y} width={barW} height={h}
+                    fill={CHART_PALETTE[0]} rx="2" />
+              <text x={x + barW / 2} y={H - PAD.b + 12}
+                    textAnchor="middle" fontSize="9.5"
+                    fill="var(--text-secondary)"
+                    fontFamily="var(--font-sans)">{d.label}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </ChartContainer>
+  );
+}
+
+// ─── Line Chart ──────────────────────────────────────────
+function LineChart({ data, title, subtitle, area = true }) {
+  const W = 400, H = 200;
+  const PAD = { l: 36, r: 12, t: 12, b: 26 };
+  const innerW = W - PAD.l - PAD.r;
+  const innerH = H - PAD.t - PAD.b;
+  const max = Math.max(...data.map(d => d.value));
+  const min = Math.min(...data.map(d => d.value), 0);
+  const range = max - min || 1;
+
+  const points = data.map((d, i) => {
+    const x = PAD.l + (i / (data.length - 1)) * innerW;
+    const y = PAD.t + (1 - (d.value - min) / range) * innerH;
+    return [x, y];
+  });
+  const pathD = points.map((p, i) =>
+    (i === 0 ? 'M' : 'L') + p[0] + ' ' + p[1]
+  ).join(' ');
+  const areaD = pathD + ` L${points[points.length - 1][0]} ${PAD.t + innerH} L${points[0][0]} ${PAD.t + innerH} Z`;
+
+  return (
+    <ChartContainer title={title} subtitle={subtitle}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+           style={{ width: '100%', height: '100%' }}>
+        <defs>
+          <linearGradient id="lineGrad" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={CHART_PALETTE[0]} stopOpacity="0.18" />
+            <stop offset="100%" stopColor={CHART_PALETTE[0]} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
+          <line key={i}
+                x1={PAD.l} x2={W - PAD.r}
+                y1={PAD.t + innerH * (1 - p)} y2={PAD.t + innerH * (1 - p)}
+                stroke="var(--border-subtle)" strokeWidth="0.5" />
+        ))}
+        {[0, 0.5, 1].map((p, i) => (
+          <text key={i} x={PAD.l - 6}
+                y={PAD.t + innerH * (1 - p) + 3}
+                textAnchor="end" fontSize="9"
+                fill="var(--text-muted)" fontFamily="var(--font-mono)">
+            {Math.round(min + range * p).toLocaleString()}
+          </text>
+        ))}
+        {area && <path d={areaD} fill="url(#lineGrad)" />}
+        <path d={pathD} fill="none" stroke={CHART_PALETTE[0]}
+              strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+        {points.map((p, i) => (
+          <circle key={i} cx={p[0]} cy={p[1]} r="2.5"
+                  fill="var(--bg-base)" stroke={CHART_PALETTE[0]} strokeWidth="1.5" />
+        ))}
+        {data.map((d, i) => i % Math.ceil(data.length / 6) === 0 && (
+          <text key={i} x={points[i][0]} y={H - PAD.b + 12}
+                textAnchor="middle" fontSize="9"
+                fill="var(--text-secondary)"
+                fontFamily="var(--font-mono)">{d.label}</text>
+        ))}
+      </svg>
+    </ChartContainer>
+  );
+}
+
+// ─── Pie / Donut ─────────────────────────────────────────
+function PieChart({ data, title, subtitle, donut = true }) {
+  const W = 400, H = 200;
+  const cx = 100, cy = H / 2, r = 72, ir = donut ? 44 : 0;
+  const total = data.reduce((s, d) => s + d.value, 0);
+  let angle = -Math.PI / 2;
+
+  const arcs = data.map((d, i) => {
+    const a0 = angle;
+    const a1 = angle + (d.value / total) * Math.PI * 2;
+    angle = a1;
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const x0 = cx + Math.cos(a0) * r, y0 = cy + Math.sin(a0) * r;
+    const x1 = cx + Math.cos(a1) * r, y1 = cy + Math.sin(a1) * r;
+    const ix0 = cx + Math.cos(a0) * ir, iy0 = cy + Math.sin(a0) * ir;
+    const ix1 = cx + Math.cos(a1) * ir, iy1 = cy + Math.sin(a1) * ir;
+    const path = donut
+      ? `M${x0} ${y0} A${r} ${r} 0 ${large} 1 ${x1} ${y1} L${ix1} ${iy1} A${ir} ${ir} 0 ${large} 0 ${ix0} ${iy0} Z`
+      : `M${cx} ${cy} L${x0} ${y0} A${r} ${r} 0 ${large} 1 ${x1} ${y1} Z`;
+    return { path, color: CHART_PALETTE[i % CHART_PALETTE.length], pct: (d.value / total * 100).toFixed(1), label: d.label };
+  });
+
+  return (
+    <ChartContainer title={title} subtitle={subtitle}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
+           style={{ width: '100%', height: '100%' }}>
+        {arcs.map((a, i) => (
+          <path key={i} d={a.path} fill={a.color}
+                stroke="var(--bg-base)" strokeWidth="1.5" />
+        ))}
+        {donut && (
+          <text x={cx} y={cy + 5} textAnchor="middle"
+                fontSize="22" fontWeight="600"
+                fill="var(--text-primary)"
+                fontFamily="var(--font-sans)">
+            {total.toLocaleString()}
+          </text>
+        )}
+        {/* Legend */}
+        <g transform={`translate(200, ${cy - data.length * 9})`}>
+          {arcs.map((a, i) => (
+            <g key={i} transform={`translate(0, ${i * 18})`}>
+              <rect x="0" y="0" width="10" height="10" rx="2" fill={a.color} />
+              <text x="16" y="9" fontSize="11"
+                    fill="var(--text-primary)"
+                    fontFamily="var(--font-sans)">{a.label}</text>
+              <text x="180" y="9" textAnchor="end" fontSize="11"
+                    fill="var(--text-secondary)"
+                    fontFamily="var(--font-mono)">{a.pct}%</text>
+            </g>
+          ))}
+        </g>
+      </svg>
+    </ChartContainer>
+  );
+}
+
+// ─── Scatter ─────────────────────────────────────────────
+function ScatterChart({ data, title, subtitle, xLabel, yLabel }) {
+  const W = 400, H = 200;
+  const PAD = { l: 36, r: 12, t: 12, b: 26 };
+  const innerW = W - PAD.l - PAD.r;
+  const innerH = H - PAD.t - PAD.b;
+  const xs = data.map(d => d.x), ys = data.map(d => d.y);
+  const xMax = Math.max(...xs), xMin = Math.min(...xs, 0);
+  const yMax = Math.max(...ys), yMin = Math.min(...ys, 0);
+  const xRange = xMax - xMin || 1, yRange = yMax - yMin || 1;
+
+  return (
+    <ChartContainer title={title} subtitle={subtitle}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+           style={{ width: '100%', height: '100%' }}>
+        {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
+          <line key={'h' + i}
+                x1={PAD.l} x2={W - PAD.r}
+                y1={PAD.t + innerH * (1 - p)} y2={PAD.t + innerH * (1 - p)}
+                stroke="var(--border-subtle)" strokeWidth="0.5" />
+        ))}
+        {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
+          <line key={'v' + i}
+                x1={PAD.l + innerW * p} x2={PAD.l + innerW * p}
+                y1={PAD.t} y2={PAD.t + innerH}
+                stroke="var(--border-subtle)" strokeWidth="0.5" />
+        ))}
+        {data.map((d, i) => {
+          const x = PAD.l + ((d.x - xMin) / xRange) * innerW;
+          const y = PAD.t + (1 - (d.y - yMin) / yRange) * innerH;
+          return (
+            <circle key={i} cx={x} cy={y} r={d.size || 4}
+                    fill={CHART_PALETTE[0]} fillOpacity="0.55"
+                    stroke={CHART_PALETTE[0]} strokeWidth="1" />
+          );
+        })}
+        {xLabel && (
+          <text x={W / 2} y={H - 4} textAnchor="middle" fontSize="9"
+                fill="var(--text-muted)"
+                fontFamily="var(--font-mono)">{xLabel}</text>
+        )}
+        {yLabel && (
+          <text x={10} y={H / 2} textAnchor="middle" fontSize="9"
+                transform={`rotate(-90 10 ${H / 2})`}
+                fill="var(--text-muted)"
+                fontFamily="var(--font-mono)">{yLabel}</text>
+        )}
+      </svg>
+    </ChartContainer>
+  );
+}
+
+Object.assign(window, { BarChart, LineChart, PieChart, ScatterChart });
+
+</script>
+<script type="text/babel" data-presets="react">
+
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "palette": ["#D97757", "#29261b", "#f6f4ef"],
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        options={['#D97757', '#2A6FDB', '#1F8A5B', '#7A5AE0']}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakColor  label="Palette" value={t.palette}
+//                        options={[['#D97757', '#29261b', '#f6f4ef'],
+//                                  ['#475569', '#0f172a', '#f1f5f9']]}
+//                        onChange={(v) => setTweak('palette', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;width:100%;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06);
+    transition:transform .12s cubic-bezier(.3,.7,.4,1),box-shadow .12s}
+  .twk-chip:hover{transform:translateY(-1px);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 4px 10px rgba(0,0,0,.12)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),
+    0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip>span{position:absolute;top:0;bottom:0;right:0;width:34%;
+    display:flex;flex-direction:column;box-shadow:-1px 0 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i{flex:1;box-shadow:0 -1px 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i:first-child{box-shadow:none}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    // Same-window signal so in-page listeners (deck-stage rail thumbnails)
+    // can react — the parent message only reaches the host, not peers.
+    window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', noDeckControls = false, children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  // Auto-inject a rail toggle when a <deck-stage> is on the page. The
+  // toggle drives the deck's per-viewer _railVisible via window message;
+  // state is mirrored from the same localStorage key the deck reads so
+  // the control reflects reality across reloads. The mechanism is the
+  // message — authors who want custom placement can post it directly
+  // and pass noDeckControls to suppress this one.
+  const hasDeckStage = React.useMemo(
+    () => typeof document !== 'undefined' && !!document.querySelector('deck-stage'),
+    [],
+  );
+  // Hide the toggle until the host has actually enabled the rail (the
+  // __omelette_rail_enabled window message, posted only when the
+  // omelette_deck_rail_enabled flag is on for this user). The initial read
+  // covers TweaksPanel mounting after the message already arrived; the
+  // listener covers the common case of mounting first.
+  const [railEnabled, setRailEnabled] = React.useState(
+    () => hasDeckStage && !!document.querySelector('deck-stage')?._railEnabled,
+  );
+  React.useEffect(() => {
+    if (!hasDeckStage || railEnabled) return undefined;
+    const onMsg = (e) => {
+      if (e.data && e.data.type === '__omelette_rail_enabled') setRailEnabled(true);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [hasDeckStage, railEnabled]);
+  const [railVisible, setRailVisible] = React.useState(() => {
+    try { return localStorage.getItem('deck-stage.railVisible') !== '0'; } catch (e) { return true; }
+  });
+  const toggleRail = (on) => {
+    setRailVisible(on);
+    window.postMessage({ type: '__deck_rail_visible', on }, '*');
+  };
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" data-noncommentable=""
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">
+          {children}
+          {hasDeckStage && railEnabled && !noDeckControls && (
+            <TweakSection label="Deck">
+              <TweakToggle label="Thumbnail rail" value={railVisible} onChange={toggleRail} />
+            </TweakSection>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  // Segments wrap mid-word once per-segment width runs out. The track is
+  // ~248px (280 panel − 28 body pad − 4 seg pad), each button loses 12px
+  // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
+  // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
+  // back to a dropdown rather than wrap.
+  const labelLen = (o) => String(typeof o === 'object' ? o.label : o).length;
+  const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
+  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
+  if (!fitsAsSegments) {
+    // <select> emits strings — map back to the original option value so the
+    // fallback stays type-preserving (numbers, booleans) like the segment path.
+    const resolve = (s) => {
+      const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
+      return m === undefined ? s : typeof m === 'object' ? m.value : m;
+    };
+    return <TweakSelect label={label} value={value} options={options}
+                        onChange={(s) => onChange(resolve(s))} />;
+  }
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+// Relative-luminance contrast pick — checkmarks drawn over a swatch need to
+// read on both #111 and #fafafa without per-option configuration. Hex input
+// only (#rgb / #rrggbb); named or rgb()/hsl() colors fall through to "light".
+function __twkIsLight(hex) {
+  const h = String(hex).replace('#', '');
+  const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');
+  const n = parseInt(x.slice(0, 6), 16);
+  if (Number.isNaN(n)) return true;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return r * 299 + g * 587 + b * 114 > 148000;
+}
+
+const __TwkCheck = ({ light }) => (
+  <svg viewBox="0 0 14 14" aria-hidden="true">
+    <path d="M3 7.2 5.8 10 11 4.2" fill="none" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          stroke={light ? 'rgba(0,0,0,.78)' : '#fff'} />
+  </svg>
+);
+
+// TweakColor — curated color/palette picker. Each option is either a single
+// hex string or an array of 1-5 hex strings; the card adapts — a lone color
+// renders solid, a palette renders colors[0] as the hero (left ~2/3) with the
+// rest stacked in a sharp column on the right. onChange emits the
+// option in the shape it was passed (string stays string, array stays array).
+// Without options it falls back to the native color input for back-compat.
+function TweakColor({ label, value, options, onChange }) {
+  if (!options || !options.length) {
+    return (
+      <div className="twk-row twk-row-h">
+        <div className="twk-lbl"><span>{label}</span></div>
+        <input type="color" className="twk-swatch" value={value}
+               onChange={(e) => onChange(e.target.value)} />
+      </div>
+    );
+  }
+  // Native <input type=color> emits lowercase hex per the HTML spec, so
+  // compare case-insensitively. String() guards JSON.stringify(undefined),
+  // which returns the primitive undefined (no .toLowerCase).
+  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const cur = key(value);
+  return (
+    <TweakRow label={label}>
+      <div className="twk-chips" role="radiogroup">
+        {options.map((o, i) => {
+          const colors = Array.isArray(o) ? o : [o];
+          const [hero, ...rest] = colors;
+          const sup = rest.slice(0, 4);
+          const on = key(o) === cur;
+          return (
+            <button key={i} type="button" className="twk-chip" role="radio"
+                    aria-checked={on} data-on={on ? '1' : '0'}
+                    aria-label={colors.join(', ')} title={colors.join(' · ')}
+                    style={{ background: hero }}
+                    onClick={() => onChange(o)}>
+              {sup.length > 0 && (
+                <span>
+                  {sup.map((c, j) => <i key={j} style={{ background: c }} />)}
+                </span>
+              )}
+              {on && <__TwkCheck light={__twkIsLight(hero)} />}
+            </button>
+          );
+        })}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+
+</script>
+<script type="text/babel" data-presets="react">
+// Main app — canvas with frames, prompt bar, glass modal.
+
+const { useState, useRef, useEffect, useCallback, useMemo } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "style": "calm",
+  "accent": "#FF5721",
+  "fontPair": "geist",
+  "density": "comfortable"
+}/*EDITMODE-END*/;
+
+const ACCENT_OPTIONS = [
+  '#FF5721', // Mistral orange
+  '#0D0D0D', // Mono
+  '#2A6FDB', // Blue
+  '#1F8A5B', // Green
+];
+
+const FONT_PAIRS = {
+  geist: { sans: "'Geist', ui-sans-serif, system-ui, sans-serif", mono: "'Geist Mono', ui-monospace, monospace", display: "'Geist', sans-serif" },
+  inter: { sans: "'Inter', ui-sans-serif, system-ui, sans-serif", mono: "'JetBrains Mono', ui-monospace, monospace", display: "'Inter', sans-serif" },
+  serif: { sans: "'Geist', ui-sans-serif, system-ui, sans-serif", mono: "'Geist Mono', ui-monospace, monospace", display: "'Instrument Serif', Georgia, serif" },
+};
+
+// ─── Initial frames (blueprint) ──────────────────────────────
+const INITIAL_FRAMES = [
+  { id: 'f1', x: 80, y: 60, w: 420, h: 260, title: 'Revenue trend', filled: 'line',
+    data: [
+      { label: 'Jan', value: 42100 }, { label: 'Feb', value: 47800 },
+      { label: 'Mar', value: 51200 }, { label: 'Apr', value: 49600 },
+      { label: 'May', value: 58400 }, { label: 'Jun', value: 64900 },
+      { label: 'Jul', value: 71200 }, { label: 'Aug', value: 78400 },
+    ],
+    chartTitle: 'GROSS · MONTHLY', chartSubtitle: '€78.4K' },
+  { id: 'f2', x: 540, y: 60, w: 360, h: 260, title: 'Top SKUs', filled: 'bar-h',
+    data: [
+      { label: 'SKU-1042', value: 18420 }, { label: 'SKU-2017', value: 15100 },
+      { label: 'SKU-9981', value: 12480 }, { label: 'SKU-3304', value: 10200 },
+      { label: 'SKU-5560', value: 7820 },
+    ], chartTitle: 'UNITS · Q3', chartSubtitle: '5 SKUs' },
+  { id: 'f3', x: 80, y: 360, w: 360, h: 240, title: 'Channel mix', filled: 'pie',
+    data: [
+      { label: 'Direct', value: 38 }, { label: 'Marketplace', value: 27 },
+      { label: 'Wholesale', value: 21 }, { label: 'Affiliate', value: 14 },
+    ], chartTitle: 'SHARE · YTD', chartSubtitle: 'Mix' },
+  { id: 'f4', x: 480, y: 360, w: 420, h: 240, title: null, filled: null },
+  { id: 'f5', x: 940, y: 60, w: 320, h: 540, title: null, filled: null },
+];
+
+// ─── Sample agent traces & responses ─────────────────────────
+const SAMPLE_TRACES = [
+  { tool: 'sql.list_tables', detail: 'discovering schema → 14 tables, 87 columns', t: '120ms' },
+  { tool: 'sql.query', detail: 'SELECT category, SUM(revenue) FROM orders WHERE date > NOW()-90d GROUP BY 1', t: '340ms' },
+  { tool: 'fastmcp.chart', detail: 'render(type="bar", x="category", y="revenue", palette="mistral")', t: '90ms' },
+];
+
+// ─── Icons ───────────────────────────────────────────────────
+const Icon = ({ name, size = 14 }) => {
+  const paths = {
+    sparkle: 'M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5z M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z',
+    arrow: 'M5 12h14m-6-6 6 6-6 6',
+    close: 'M6 6l12 12M6 18 18 6',
+    plus: 'M12 5v14m-7-7h14',
+    minus: 'M5 12h14',
+    target: 'M12 12m-9 0a9 9 0 1 0 18 0 9 9 0 1 0-18 0 M12 12m-4 0a4 4 0 1 0 8 0 4 4 0 1 0-8 0 M12 12m-1 0a1 1 0 1 0 2 0 1 1 0 1 0-2 0',
+    spinner: 'M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83',
+    chat: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+    grid: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth="1.6"
+         strokeLinecap="round" strokeLinejoin="round">
+      <path d={paths[name]} />
+    </svg>
+  );
+};
+
+// ─── Chart renderer dispatch ─────────────────────────────────
+function FrameChart({ frame }) {
+  const props = { data: frame.data, title: frame.chartTitle, subtitle: frame.chartSubtitle };
+  switch (frame.filled) {
+    case 'bar': return <BarChart {...props} />;
+    case 'bar-h': return <BarChart {...props} horizontal />;
+    case 'line': return <LineChart {...props} />;
+    case 'pie': return <PieChart {...props} />;
+    case 'scatter': return <ScatterChart {...props} />;
+    default: return null;
+  }
+}
+
+// ─── Frame component ─────────────────────────────────────────
+function Frame({ frame, idx, selected, onSelect, onClear, loading }) {
+  return (
+    <div className={`frame ${frame.filled ? '' : 'empty'} ${selected ? 'selected' : ''}`}
+         data-screen-label={`Frame ${String(idx + 1).padStart(2, '0')}`}
+         style={{ left: frame.x, top: frame.y, width: frame.w, height: frame.h }}
+         onClick={(e) => { e.stopPropagation(); onSelect(frame.id); }}>
+      <div className="frame-tag">FRAME {String(idx + 1).padStart(2, '0')} · TARGETED</div>
+      {frame.filled && (
+        <div className="frame-head">
+          <span className="title">{frame.title}</span>
+          <span className="meta">
+            <span>{frame.filled}</span>
+            <button className="frame-close" onClick={(e) => { e.stopPropagation(); onClear(frame.id); }}
+                    aria-label="Clear frame">
+              <Icon name="close" size={12} />
+            </button>
+          </span>
+        </div>
+      )}
+      <div className="frame-body">
+        {!frame.filled && !loading && (
+          <div className="frame-empty-content">
+            <div className="label">FRAME {String(idx + 1).padStart(2, '0')}</div>
+            <div className="hint">
+              {selected ? 'Type your request below' : 'Click to target this frame'}
+            </div>
+            {selected && <span className="kbd">⌘K to focus prompt</span>}
+          </div>
+        )}
+        {frame.filled && !loading && <FrameChart frame={frame} />}
+        {loading && (
+          <div className="frame-loading">
+            <div className="skel">
+              <div className="skel-bar" style={{ height: 16, width: '40%' }} />
+              <div className="skel-bar" style={{ flex: 1 }} />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Liquid Glass Modal ──────────────────────────────────────
+function GlassModal({ open, onClose, conversation, agentState, currentTrace }) {
+  const bodyRef = useRef(null);
+  useEffect(() => {
+    if (open && bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    }
+  }, [open, conversation.length, currentTrace.length]);
+
+  return (
+    <>
+      <div className={`glass-overlay ${open ? 'open' : ''}`}
+           onClick={onClose}
+           style={{ pointerEvents: open ? 'auto' : 'none' }} />
+      <div className={`glass-modal ${open ? 'open' : ''}`}
+           style={{ pointerEvents: open ? 'auto' : 'none' }}>
+        <div className="glass-head">
+          <h2>
+            Agent thread
+            {agentState === 'thinking' && <span className="live"><i />Live</span>}
+          </h2>
+          <button className="glass-close" onClick={onClose} aria-label="Close">
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+        <div className="glass-body" ref={bodyRef}>
+          {conversation.map((m, i) => (
+            <React.Fragment key={i}>
+              <div className={`msg ${m.role}`}>
+                <div className="msg-meta">
+                  {m.role === 'user' ? 'You' : 'Agent'}
+                  {m.frame && ` · Frame ${m.frame}`}
+                </div>
+                <div className="msg-bubble">{m.text}</div>
+              </div>
+              {m.trace && m.trace.length > 0 && (
+                <div className="trace">
+                  {m.trace.map((s, j) => (
+                    <div key={j} className="trace-step done">
+                      <div className="step-icon">✓</div>
+                      <div className="step-body">
+                        <div className="step-title">
+                          <span>Tool call</span>
+                          <span className="step-tool">{s.tool}</span>
+                          <span className="step-time">{s.t}</span>
+                        </div>
+                        <div className="step-detail">{s.detail}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </React.Fragment>
+          ))}
+          {currentTrace.length > 0 && (
+            <div className="trace">
+              {currentTrace.map((s, j) => (
+                <div key={j} className={`trace-step ${s.done ? 'done' : 'active'}`}>
+                  <div className="step-icon">{s.done ? '✓' : '·'}</div>
+                  <div className="step-body">
+                    <div className="step-title">
+                      <span>{s.done ? 'Tool call' : 'Calling'}</span>
+                      <span className="step-tool">{s.tool}</span>
+                      {s.done && <span className="step-time">{s.t}</span>}
+                    </div>
+                    <div className="step-detail">{s.detail}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Main App ────────────────────────────────────────────────
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [frames, setFrames] = useState(INITIAL_FRAMES);
+  const [selectedFrame, setSelectedFrame] = useState(null);
+  const [prompt, setPrompt] = useState('');
+  const [agentState, setAgentState] = useState('idle'); // idle | thinking | done
+  const [modalOpen, setModalOpen] = useState(false);
+  const [conversation, setConversation] = useState([
+    { role: 'user', text: 'Show me revenue by month for the last 8 months', frame: '01' },
+    { role: 'assistant', text: 'Done — rendered an area chart in Frame 01. Revenue is up 86% from January, with the steepest gain in the past two months.', frame: '01',
+      trace: SAMPLE_TRACES },
+  ]);
+  const [currentTrace, setCurrentTrace] = useState([]);
+  const [loadingFrame, setLoadingFrame] = useState(null);
+  const [zoom, setZoom] = useState(0.85);
+  const [pan, setPan] = useState({ x: 40, y: 20 });
+  const [panning, setPanning] = useState(false);
+  const inputRef = useRef(null);
+  const canvasRef = useRef(null);
+  const panState = useRef(null);
+
+  // Apply CSS vars from tweaks
+  useEffect(() => {
+    document.body.classList.toggle('style-editorial', t.style === 'editorial');
+    document.body.classList.toggle('density-compact', t.density === 'compact');
+    const fonts = FONT_PAIRS[t.fontPair] || FONT_PAIRS.geist;
+    document.documentElement.style.setProperty('--font-sans', fonts.sans);
+    document.documentElement.style.setProperty('--font-mono', fonts.mono);
+    document.documentElement.style.setProperty('--font-display', fonts.display);
+    document.documentElement.style.setProperty('--accent', t.accent);
+    // Compute hover/subtle/muted from accent
+    document.documentElement.style.setProperty('--accent-hover', t.accent);
+  }, [t]);
+
+  // Cmd+K to focus prompt
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+      if (e.key === 'Escape') {
+        if (modalOpen) setModalOpen(false);
+        else setSelectedFrame(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [modalOpen]);
+
+  // Pan + zoom on canvas (alt+drag or middle-button to pan; wheel to zoom)
+  const onCanvasMouseDown = (e) => {
+    if (e.button === 1 || e.altKey || e.target.classList.contains('canvas') || e.target.classList.contains('canvas-grid')) {
+      setPanning(true);
+      panState.current = { sx: e.clientX, sy: e.clientY, px: pan.x, py: pan.y };
+      e.preventDefault();
+    }
+  };
+  useEffect(() => {
+    if (!panning) return;
+    const move = (e) => {
+      if (!panState.current) return;
+      setPan({
+        x: panState.current.px + (e.clientX - panState.current.sx),
+        y: panState.current.py + (e.clientY - panState.current.sy),
+      });
+    };
+    const up = () => { setPanning(false); panState.current = null; };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+  }, [panning]);
+
+  const onWheel = (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      setZoom(z => Math.max(0.3, Math.min(2, z - e.deltaY * 0.002)));
+    } else {
+      setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
+    }
+  };
+
+  const submitPrompt = () => {
+    if (!prompt.trim() || !selectedFrame) return;
+    const targetIdx = frames.findIndex(f => f.id === selectedFrame);
+    if (targetIdx < 0) return;
+    const promptText = prompt;
+    const frameLabel = String(targetIdx + 1).padStart(2, '0');
+
+    setConversation(c => [...c, { role: 'user', text: promptText, frame: frameLabel }]);
+    setPrompt('');
+    setAgentState('thinking');
+    setLoadingFrame(selectedFrame);
+    setCurrentTrace([]);
+
+    // Simulate trace
+    const steps = [
+      { tool: 'sql.list_tables', detail: 'discovering schema → 14 tables', delay: 600 },
+      { tool: 'sql.query', detail: `SELECT category, SUM(orders) FROM data WHERE ${promptText.slice(0, 32)}...`, delay: 900 },
+      { tool: 'fastmcp.chart', detail: 'render(type="bar", palette="mistral")', delay: 700 },
+    ];
+    let timer = 0;
+    steps.forEach((s, i) => {
+      timer += s.delay;
+      setTimeout(() => {
+        setCurrentTrace(curr => {
+          const next = curr.map(c => ({ ...c, done: true }));
+          next.push({ tool: s.tool, detail: s.detail, done: false });
+          return next;
+        });
+      }, timer);
+      setTimeout(() => {
+        setCurrentTrace(curr => curr.map((c, j) => j === i ? { ...c, done: true, t: `${(s.delay * 0.4) | 0}ms` } : c));
+      }, timer + 200);
+    });
+
+    // Resolve
+    setTimeout(() => {
+      const newData = [
+        { label: 'A', value: 12 + Math.random() * 30 },
+        { label: 'B', value: 18 + Math.random() * 40 },
+        { label: 'C', value: 9 + Math.random() * 25 },
+        { label: 'D', value: 22 + Math.random() * 35 },
+        { label: 'E', value: 14 + Math.random() * 28 },
+      ].map(d => ({ ...d, value: Math.round(d.value) }));
+      setFrames(fs => fs.map(f => f.id === selectedFrame
+        ? { ...f, filled: 'bar', title: promptText.slice(0, 40),
+            chartTitle: 'GENERATED', chartSubtitle: 'Result',
+            data: newData }
+        : f));
+      setLoadingFrame(null);
+      setAgentState('done');
+      const finishedTrace = steps.map(s => ({ tool: s.tool, detail: s.detail, t: `${(s.delay * 0.4) | 0}ms` }));
+      setConversation(c => [...c, {
+        role: 'assistant',
+        text: `Rendered a chart in Frame ${frameLabel} from your prompt. The agent ran ${steps.length} tool calls.`,
+        frame: frameLabel, trace: finishedTrace,
+      }]);
+      setCurrentTrace([]);
+      setTimeout(() => setAgentState('idle'), 1500);
+    }, timer + 500);
+  };
+
+  const clearFrame = (id) => {
+    setFrames(fs => fs.map(f => f.id === id ? { ...f, filled: null, title: null, data: null } : f));
+  };
+
+  const onCanvasClick = (e) => {
+    if (e.target === canvasRef.current || e.target.classList.contains('canvas-grid')) {
+      setSelectedFrame(null);
+    }
+  };
+
+  const selectedIdx = frames.findIndex(f => f.id === selectedFrame);
+
+  return (
+    <>
+      {/* Top bar */}
+      <div className="topbar">
+        <div className="topbar-l">
+          <div className="logo">
+            <div className="logo-mark">P</div>
+            <span>poc dashboard</span>
+          </div>
+          <span className="crumb-sep">/</span>
+          <span className="crumb"><b>Q3 Sales</b> · untitled board</span>
+        </div>
+        <div className="topbar-r">
+          <span className="pill"><span className="dot" />MCP · 2 tools</span>
+          <button className="icon-btn" title="History"><Icon name="chat" size={15} /></button>
+          <button className="icon-btn" title="Add frame"><Icon name="plus" size={15} /></button>
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div className={`canvas-host ${modalOpen ? 'glass-active' : ''}`}
+           onWheel={onWheel}>
+        <div ref={canvasRef}
+             className={`canvas ${panning ? 'panning' : ''}`}
+             onMouseDown={onCanvasMouseDown}
+             onClick={onCanvasClick}
+             style={{
+               transform: modalOpen
+                 ? `translate(${pan.x}px, ${pan.y}px) scale(${zoom * 1.04})`
+                 : `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+               filter: modalOpen ? 'brightness(0.95) saturate(1.1)' : 'none',
+               transition: 'transform .35s cubic-bezier(.2,.9,.25,1.05), filter .3s',
+             }}>
+          <div className="canvas-grid" />
+          {frames.map((f, i) => (
+            <Frame key={f.id} frame={f} idx={i}
+                   selected={f.id === selectedFrame}
+                   onSelect={setSelectedFrame}
+                   onClear={clearFrame}
+                   loading={loadingFrame === f.id} />
+          ))}
+        </div>
+      </div>
+
+      {/* Zoom indicator */}
+      <div className="zoom-indicator">
+        <button onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}><Icon name="minus" size={12} /></button>
+        <span className="zval">{Math.round(zoom * 100)}%</span>
+        <button onClick={() => setZoom(z => Math.min(2, z + 0.1))}><Icon name="plus" size={12} /></button>
+      </div>
+
+      {/* Prompt bar */}
+      <div className={`prompt-bar ${selectedFrame ? 'targeting' : ''}`}>
+        {selectedFrame && (
+          <div className="prompt-target">
+            <span>Targeting</span>
+            <span className="chip">
+              <i />
+              FRAME {String(selectedIdx + 1).padStart(2, '0')}
+              <span className="chip-x" onClick={() => setSelectedFrame(null)}>✕</span>
+            </span>
+          </div>
+        )}
+        <div className="prompt-row">
+          <textarea ref={inputRef}
+                    className="prompt-input"
+                    rows={1}
+                    placeholder={selectedFrame
+                      ? `Ask anything for Frame ${String(selectedIdx + 1).padStart(2, '0')}…`
+                      : 'Click an empty frame, then ask…'}
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        submitPrompt();
+                      }
+                    }} />
+          <div className="prompt-actions">
+            <button className={`agent-pill ${agentState === 'thinking' ? 'active' : ''}`}
+                    onClick={() => setModalOpen(true)}>
+              <span className="agent-dot">
+                {agentState === 'thinking'
+                  ? <Icon name="spinner" size={12} />
+                  : <Icon name="sparkle" size={12} />}
+              </span>
+              {agentState === 'thinking' ? 'Thinking…' : agentState === 'done' ? 'Done' : 'Agent'}
+            </button>
+            <button className={`send-btn ${prompt.trim() && selectedFrame ? 'ready' : ''}`}
+                    disabled={!prompt.trim() || !selectedFrame}
+                    onClick={submitPrompt}
+                    aria-label="Send">
+              <Icon name="arrow" size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="prompt-hint">
+          <span><span className="kbd">⌘K</span> focus</span>
+          <span><span className="kbd">↵</span> send</span>
+          <span><span className="kbd">Esc</span> clear</span>
+          <span style={{ marginLeft: 'auto' }}>powered by langgraph + fastmcp</span>
+        </div>
+      </div>
+
+      {/* Liquid glass modal */}
+      <GlassModal open={modalOpen} onClose={() => setModalOpen(false)}
+                  conversation={conversation}
+                  agentState={agentState}
+                  currentTrace={currentTrace} />
+
+      {/* Tweaks */}
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Direction">
+          <TweakRadio label="Style" value={t.style}
+                      options={[{ value: 'calm', label: 'Calm' }, { value: 'editorial', label: 'Editorial' }]}
+                      onChange={(v) => setTweak('style', v)} />
+        </TweakSection>
+        <TweakSection label="Aesthetics">
+          <TweakColor label="Accent" value={t.accent}
+                      options={ACCENT_OPTIONS}
+                      onChange={(v) => setTweak('accent', v)} />
+          <TweakSelect label="Font pair" value={t.fontPair}
+                       options={[
+                         { value: 'geist', label: 'Geist + Geist Mono' },
+                         { value: 'inter', label: 'Inter + JetBrains' },
+                         { value: 'serif', label: 'Geist + Instrument Serif' },
+                       ]}
+                       onChange={(v) => setTweak('fontPair', v)} />
+        </TweakSection>
+        <TweakSection label="Layout">
+          <TweakRadio label="Density" value={t.density}
+                      options={[{ value: 'compact', label: 'Compact' }, { value: 'comfortable', label: 'Comfortable' }]}
+                      onChange={(v) => setTweak('density', v)} />
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+</script>
+
+</body>
+</html>

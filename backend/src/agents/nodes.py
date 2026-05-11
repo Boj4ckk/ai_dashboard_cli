@@ -1,29 +1,23 @@
-
-
 from agents.state import GlobalState
-from langchain_core.messages import AIMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 
-async def generate_query_node(state:GlobalState) -> GlobalState:
-
+async def generate_query_node(state: GlobalState) -> GlobalState:
     ai_provider = state.get('ai_provider')
     if not ai_provider:
         print('No ai provider')
         return state
     try:
-        response = ai_provider.generate_structured(
-            prompt=state['user_prompt'],
-            system_prompt=state['system_prompt'],
-            max_completion_tokens=10000
-        )
+        messages = []
+        if state.get('system_prompt'):
+            messages.append(SystemMessage(content=state['system_prompt']))
+        messages.append(HumanMessage(content=state['user_prompt']))
 
-        if response.error:
-            print(f"Generation error: {response.error}")
-            return state
+        response = await ai_provider.llm.ainvoke(messages)
 
         return {
             **state,
-            "messages": [AIMessage(content=response.content)],
+            "messages": [response],
         }
 
     except Exception as e:

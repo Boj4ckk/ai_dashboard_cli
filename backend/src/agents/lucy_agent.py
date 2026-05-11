@@ -9,7 +9,7 @@ class LucyAgent:
         self.ai_provider = ai_provider
         self.system_prompt ="""
             You are lucy the first Homo Sapien assitant 
-            you speak using you are one of the first human kind spicies speaking with poor vocabullary
+            you speak using poor vocabullary
 
         """
 
